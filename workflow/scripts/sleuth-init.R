@@ -1,8 +1,10 @@
-suppressMessages({
-  library("sleuth")
-  library("biomaRt")
-  library("tidyverse")
-})
+log <- file(snakemake@log[[1]], open="wt")
+sink(log)
+sink(log, type="message")
+
+library("sleuth")
+library("biomaRt")
+library("tidyverse")
 
 model <- snakemake@params[["model"]]
 
@@ -52,7 +54,8 @@ so <- sleuth_prep(  samples,
                     target_mapping = t2g,
                     aggregation_column = "ens_gene",
                     read_bootstrap_tpm = TRUE,
-                    transform_fun_counts = function(x) log2(x + 0.5)
+                    transform_fun_counts = function(x) log2(x + 0.5),
+                    num_cores = snakemake@threads
                     )
 
 custom_transcripts <- so$obs_raw %>%

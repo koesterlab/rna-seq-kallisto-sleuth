@@ -1,11 +1,14 @@
-suppressPackageStartupMessages({
-  library("fgsea")
-})
+log <- file(snakemake@log[[1]], open="wt")
+sink(log)
+sink(log, type="message")
+
+library("fgsea")
 
 # provides library("tidyverse") and function get_prefix_col()
-source('workflow/scripts/common.R')
+# the latter requires snakemake@output[["samples"]] and
+# snakemake@params[["covariate"]]
+source( file.path(snakemake@scriptdir, 'common.R') )
 
-covariate <- snakemake@params[["covariate"]]
 
 gene_sets <- gmtPathways(snakemake@input[["gene_sets"]])
 sig_gene_sets <- read_tsv(snakemake@input[["sig_gene_sets"]])
@@ -18,7 +21,7 @@ diffexp <- read_tsv(snakemake@input[["diffexp"]]) %>%
                 	mutate(ens_gene = str_c(ens_gene, collapse=",")) %>%
 			distinct()
 
-signed_pi <- get_prefix_col(covariate, "signed_pi_value", colnames(diffexp))
+signed_pi <- get_prefix_col("signed_pi_value", colnames(diffexp))
 
 ranked_genes <- diffexp %>%
                   dplyr::select(ext_gene, !!signed_pi) %>%

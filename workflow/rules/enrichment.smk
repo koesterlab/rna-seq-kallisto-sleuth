@@ -1,13 +1,41 @@
+from pathlib import Path
+
+
+rule download_bioconductor_species_database:
+    output:
+        directory("resources/bioconductor/lib/R/library/{package}")
+    params:
+        path=lambda wc, output: Path(output[0]).parents[3],
+        version=config["resources"]["ref"]["species_db_version"]
+    log:
+        "logs/resources/bioconductor/{package}.log"
+    shell:
+        "conda create --yes --quiet -p {params.path} --channel bioconda bioconductor-{wildcards.package}={params.version}"
+
+
+# topology- and interaction-aware pathway enrichment analysis
+
 rule spia:
     input:
-        diffexp="analysis/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv"
+        samples="results/sleuth/samples.tsv",
+        species_anno=get_bioc_pkg_path,
+        diffexp="results/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv"
     output:
-        "analysis/tables/pathways/{model}.pathways.tsv"
+        table=report(
+            "results/tables/pathways/{model}.pathways.tsv",
+            caption="../report/spia.rst",
+            category="Pathway enrichment analysis"
+        ),
+        plots="results/plots/pathways/{model}.spia-perturbation-plots.pdf"
     params:
+        bioc_pkg=get_bioc_species_pkg,
         species=config["resources"]["ref"]["species"],
+        pathway_db=config["enrichment"]["spia"]["pathway_database"],
         covariate=lambda w: config["diffexp"]["models"][w.model]["primary_variable"]
     conda:
         "../envs/spia.yaml"
+    log:
+        "logs/tables/pathways/{model}.spia-pathways.log"
     threads: 16
     script:
         "../scripts/spia.R"
@@ -16,103 +44,114 @@ rule spia:
 
 checkpoint fgsea:
     input:
-        diffexp="analysis/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv",
-        gene_sets=config["enrichment"]["gene_sets_file"]
+        samples="results/sleuth/samples.tsv",
+        diffexp="results/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv",
+        species_anno=get_bioc_pkg_path,
+        gene_sets=config["enrichment"]["fgsea"]["gene_sets_file"]
     output:
         enrichment=report(
-            "analysis/tables/fgsea/{model}.all-gene-sets.tsv",
+            "results/tables/fgsea/{model}.all-gene-sets.tsv",
             caption="../report/fgsea-table-all.rst",
             category="Gene set enrichment analysis"
-            ),
+        ),
         rank_ties=report(
-            "analysis/tables/fgsea/{model}.rank-ties.tsv",
+            "results/tables/fgsea/{model}.rank-ties.tsv",
             caption="../report/fgsea-rank-ties.rst",
             category="Gene set enrichment analysis"
-            ),
+        ),
         significant=report(
-            "analysis/tables/fgsea/{model}.sig-gene-sets.tsv",
+            "results/tables/fgsea/{model}.sig-gene-sets.tsv",
             caption="../report/fgsea-table-significant.rst",
             category="Gene set enrichment analysis"
-            ),
+        ),
         plot=report(
-            "analysis/plots/fgsea/{model}.table-plot.pdf",
+            "results/plots/fgsea/{model}.table-plot.pdf",
             caption="../report/fgsea-table-plot.rst",
             category="Gene set enrichment analysis"
-            )
+        )
     params:
-        species=config["resources"]["ref"]["species"],
+        bioc_pkg=get_bioc_species_pkg,
         model=get_model,
         gene_set_fdr=config["enrichment"]["fgsea"]["fdr_gene_set"],
         nperm=config["enrichment"]["fgsea"]["nperm"],
         covariate=lambda w: config["diffexp"]["models"][w.model]["primary_variable"]
     conda:
         "../envs/fgsea.yaml"
+    log:
+        "logs/tables/fgsea/{model}.gene-set-enrichment.log"
     threads: 8
     script:
         "../scripts/fgsea.R"
 
 rule fgsea_plot_gene_set:
     input:
-        diffexp="analysis/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv",
-        gene_sets=config["enrichment"]["gene_sets_file"],
-        sig_gene_sets="analysis/tables/fgsea/{model}.sig-gene-sets.tsv"
+        samples="results/sleuth/samples.tsv",
+        diffexp="results/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv",
+        gene_sets=config["enrichment"]["fgsea"]["gene_sets_file"],
+        sig_gene_sets="results/tables/fgsea/{model}.sig-gene-sets.tsv"
     output:
         report(
-            "analysis/plots/fgsea/{model}.{gene_set}.gene-set-plot.pdf",
+            "results/plots/fgsea/{model}.{gene_set}.gene-set-plot.pdf",
             caption="../report/fgsea-gene-set-plot.rst",
             category="Gene set enrichment analysis"
-            )
+        )
     params:
         model=get_model,
         covariate=lambda w: config["diffexp"]["models"][w.model]["primary_variable"]
     conda:
         "../envs/fgsea.yaml"
+    log:
+        "logs/plots/fgsea/{model}.{gene_set}.plot_gene_set.log"
     script:
         "../scripts/fgsea_plot_gene_set.R"
 
 ## gene ontology term enrichment analysis
 
-rule biomart_ens_gene_to_go:
+rule ens_gene_to_go:
+    input:
+        species_anno=get_bioc_pkg_path
     output:
-        config["resources"]["ontology"]["ens_gene_to_go_file"]
+        "resources/ontology/ens_gene_to_go.tsv"
     params:
-        species=config["resources"]["ref"]["species"]
+        bioc_pkg=get_bioc_species_pkg
     conda:
-        "../envs/biomart-download.yaml"
+        "../envs/ens_gene_to_go.yaml"
+    log:
+        "logs/resources/ens_gene_to_go.log"
     script:
-        "../scripts/biomart-ens_gene_to_go.R"
+        "../scripts/ens_gene_to_go.R"
 
 
 rule download_go_obo:
     output:
-        config["resources"]["ontology"]["gene_ontology_file"]
+        "resources/ontology/gene_ontology.obo"
     params:
         download=config["resources"]["ontology"]["gene_ontology"]
     conda:
         "../envs/curl.yaml"
     log:
-        "analysis/logs/curl/download_go_obo.log"
+        "logs/resources/curl.download_go_obo.log"
     shell:
         "( curl --silent -o {output} {params.download} ) 2> {log}"
 
 rule goatools_go_enrichment:
     input:
-        obo=config["resources"]["ontology"]["gene_ontology_file"],
-        ens_gene_to_go=config["resources"]["ontology"]["ens_gene_to_go_file"],
-        diffexp="analysis/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv"
+        obo="resources/ontology/gene_ontology.obo",
+        ens_gene_to_go="resources/ontology/ens_gene_to_go.tsv",
+        diffexp="results/tables/diffexp/{model}.genes-mostsigtrans.diffexp.tsv"
     output:
         enrichment=report(
-            "analysis/tables/go_terms/{model}.genes-mostsigtrans.diffexp.go_term_enrichment.gene_fdr_{gene_fdr}.go_term_fdr_{go_term_fdr}.tsv",
+            "results/tables/go_terms/{model}.genes-mostsigtrans.diffexp.go_term_enrichment.gene_fdr_{gene_fdr}.go_term_fdr_{go_term_fdr}.tsv",
             caption="../report/go-enrichment-mostsigtrans-table.rst",
             category="GO term enrichment analysis"
-            ),
+        ),
         plot=report(
-            expand("analysis/plots/go_terms/{{model}}.genes-mostsigtrans.diffexp.go_term_enrichment_{ns}.gene_fdr_{{gene_fdr}}.go_term_fdr_{{go_term_fdr}}.pdf",
+            expand("results/plots/go_terms/{{model}}.genes-mostsigtrans.diffexp.go_term_enrichment_{ns}.gene_fdr_{{gene_fdr}}.go_term_fdr_{{go_term_fdr}}.pdf",
                     ns = ['BP', 'CC', 'MF']
-                    ),
+            ),
             caption="../report/go-enrichment-mostsigtrans-plot.rst",
             category="GO term enrichment analysis"
-            )
+        )
     params:
         species=config["resources"]["ref"]["species"],
         model=get_model,
@@ -120,8 +159,7 @@ rule goatools_go_enrichment:
         go_term_fdr=lambda wc: wc.go_term_fdr.replace('-','.')
     conda:
         "../envs/goatools.yaml"
+    log:
+        "logs/goatools/tables_and_plots.{model}.genes-mostsigtrans.diffexp.go_term_enrichment.gene_fdr_{gene_fdr}.go_term_fdr_{go_term_fdr}.log"
     script:
         "../scripts/goatools-go-enrichment-analysis.py"
-
-
-

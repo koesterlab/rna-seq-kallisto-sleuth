@@ -1,28 +1,25 @@
 samples: config/samples.tsv
 units: config/units.tsv
 
-# the sequencing adapter
-adapter: "GATCGGAAGAGCACACGTCTGAACTCCAGTCACATCACGATCTCGTATGCCGTCTTCTGCTTG"
-
 resources:
   ref:
     transcriptome: "resources/ref/Mus_musculus.GRCm38.cdna.all.plus_RUNX1a_GFP.fa"
     # species needs to be an identifier known to biomart, e.g. mmusculus, hsapiens
     species: mmusculus
+    # this is the version of the bioconda package `bioconductor-org.{species}`.eg.db` that
+    # you want -- this needs to be compatible with the versions `r-base` and the
+    # bioconductor packages specified e.g. in `envs/` files `fgsea.yaml`, `spia.yaml` and
+    # `ens_gene_to_go.yaml`
+    species_db_version: "3.10"
   ontology:
     # gene ontology to download, used e.g. in goatools
     gene_ontology: "http://current.geneontology.org/ontology/go-basic.obo"
-    # file name to use for downloaded gene ontology
-    gene_ontology_file: "resources/ontology/gene_ontology.obo"
-    # filename to save ensemble gene to GO term mapping to (downloaded via biomart)
-    ens_gene_to_go_file: "resources/ontology/ens_gene_to_go.tsv"
 
 pca:
   labels:
     # columns of sample sheet to use for PCA
     - RUNX1a
     - Dox
-
 
 diffexp:
   # samples to exclude (e.g. outliers due to technical problems)
@@ -43,13 +40,24 @@ diffexp:
       primary_variable: RUNX1a_AND_Dox
 
 enrichment:
-  gene_sets_file: "resources/gene_sets/all_gene_sets.gmt"
   goatools:
+    # tool is only run if set to `true`
+    activate: true
     fdr_genes: 0.05
     fdr_go_terms: 0.05
   fgsea:
+    # tool is only run if set to `true`
+    activate: true
+    # if activated, you need to provide a GMT file with gene sets of interest
+    gene_sets_file: "resources/gene_sets/all_gene_sets.gmt"
     fdr_gene_set: 0.05
     nperm: 100000
+  spia:
+    # tool is only run if set to `true`
+    activate: true
+    # pathway database to use in SPIA, needs to be available for
+    # the species specified by resources -> ref -> species above
+    pathway_database: "reactome"
 
 bootstrap_plots:
   # desired false discovery rate for bootstrap plots, i.e. a lower FDR will result in fewer boxplots generated
@@ -67,6 +75,10 @@ bootstrap_plots:
     - Egfl7
     - Gimap6
     - Gimap4
+
+plot_vars:
+  # significance level used for plot_vars() plots
+  sig_level: 0.1
 
 params:
   kallisto: "-b 100"
