@@ -4,9 +4,11 @@ sink(log, type="message")
 
 library("fgsea")
 
-# provides library("tidyverse") and functions load_bioconductor_package() and
-# get_prefix_col(), the latter requires snakemake@output[["samples"]] and
-# snakemake@params[["covariate"]]
+# * provides library("tidyverse")
+# * tries to load require("RhpcBLASctl") to limit BLAS core usage
+# * provides functions load_bioconductor_package() and
+#   get_prefix_col(), the latter requires snakemake@output[["samples"]]
+#   and snakemake@params[["covariate"]]
 source( file.path(snakemake@scriptdir, 'common.R') )
 
 pkg <- snakemake@params[["bioc_pkg"]]
@@ -67,8 +69,8 @@ if ( (fgsea_res %>% count() %>% pull(n)) == 0 ) {
                         leading_edge_entrez_id = str_c(leading_edge_entrez_id, collapse = ','),
                         leading_edge_ens_gene = str_c(leading_edge_ens_gene, collapse = ',')
                     ) %>%
-                    inner_join(fgsea_res %>% select(-leadingEdge), by = "pathway") %>%
-                    select(-leadingEdge, -leading_edge_symbol,
+                    inner_join(fgsea_res %>% dplyr::select(-leadingEdge), by = "pathway") %>%
+                    dplyr::select(-leadingEdge, -leading_edge_symbol,
                            -leading_edge_entrez_id, -leading_edge_ens_gene,
                             leading_edge_symbol, leading_edge_ens_gene,
                             leading_edge_entrez_id, leadingEdge)

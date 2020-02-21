@@ -3,12 +3,15 @@ sink(log)
 sink(log, type="message")
 
 library("SPIA")
-library("graphite")
 
-# provides library("tidyverse") and functions load_bioconductor_package() and
-# get_prefix_col(), the latter requires snakemake@output[["samples"]] and
-# snakemake@params[["covariate"]]
+# * provides library("tidyverse")
+# * tries to load require("RhpcBLASctl") to limit BLAS core usage
+# * provides functions load_bioconductor_package() and
+#   get_prefix_col(), the latter requires snakemake@output[["samples"]]
+#   and snakemake@params[["covariate"]]
 source( file.path(snakemake@scriptdir, 'common.R') )
+
+library("graphite")
 
 pkg <- snakemake@params[["bioc_pkg"]]
 load_bioconductor_package(snakemake@input[["species_anno"]], pkg)

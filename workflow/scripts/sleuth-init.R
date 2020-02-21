@@ -4,7 +4,14 @@ sink(log, type="message")
 
 library("sleuth")
 library("biomaRt")
-library("tidyverse")
+
+# * provides library("tidyverse")
+# * tries to load require("RhpcBLASctl") to limit BLAS core usage
+# * provides functions load_bioconductor_package() and
+#   get_prefix_col(), the latter requires snakemake@output[["samples"]]
+#   and snakemake@params[["covariate"]]
+source( file.path(snakemake@scriptdir, 'common.R') )
+
 
 model <- snakemake@params[["model"]]
 

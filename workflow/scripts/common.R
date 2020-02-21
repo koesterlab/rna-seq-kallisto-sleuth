@@ -1,5 +1,41 @@
 library("tidyverse")
 
+# this prevents R from grabbing all available cores whenever doing
+# any linear algebra with some parallelised BLAS variant in the
+# background
+if require("RhpcBLASctl") {
+
+    if any( c("parallel",
+                "snow",
+                "snowFT",
+                "snowfall",
+                "foreach",
+                "future") %in% loadedNamespaces() ) {
+        # if any of the packages above is loaded, this suggests
+        # internal parallelization in loaded packages, see:
+        # https://cran.r-project.org/web/views/HighPerformanceComputing.html
+
+        # parallelized code and BLAS parallelization may not work together
+        # well, see e.g.:
+        # https://cran.r-project.org/doc/manuals/R-admin.html#BLAS
+        blas_set_num_threads(1)
+        omp_set_num_threads(1)
+
+    } else {
+
+        # either of these commands sufficed in testing, but better be safe
+        blas_set_num_threads(snakemake@threads)
+        omp_set_num_threads(snakemake@threads)
+    }
+} else {
+    print( str_c( "If this R rule does any linear algebra, consider adding a recent\n",
+                  "version of r-rhpcblasctl to the conda environment yaml. This will\n",
+                  "ensure that the CPU usage of the BLAS behind R linear algebra\n",
+                  "stays restricted to the threads you specified in the rule definition.\n"
+                )
+         )
+}
+
 load_bioconductor_package <- function(path_to_bioc_pkg, pkg_name) {
 
     lib <- str_remove(path_to_bioc_pkg, pkg_name)
