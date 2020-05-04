@@ -1,7 +1,0 @@
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - r-sleuth =0.30
-    #- r-base =3.5.1=h271c98b_1006
-  - r-base =3.6

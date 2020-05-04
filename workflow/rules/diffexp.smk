@@ -44,11 +44,22 @@ rule sleuth_init:
     script:
         "../scripts/sleuth-init.R"
 
-
-checkpoint sleuth_diffexp:
+rule sleuth_diffexp:
     input:
         "results/sleuth/{model}.rds"
     output:
+        mean_var_plot=report("results/plots/mean-var/{model}.mean-variance-plot.pdf",
+                            caption="../report/plot-mean-var.rst",
+                            category="QC"),
+        volcano_plots=report("results/plots/volcano/{model}.volcano-plots.pdf",
+                            caption="../report/plot-volcano.rst",
+                            category="QC"),
+        ma_plots=report("results/plots/ma/{model}.ma-plots.pdf",
+                            caption="../report/plot-ma.rst",
+                            category="QC"),
+        qq_plots=report("results/plots/qq/{model}.qq-plots.pdf",
+                            caption="../report/plot-qq.rst",
+                            category="QC"),
         transcripts_rds="results/sleuth/diffexp/{model}.transcripts.diffexp.rds",
         genes_aggregated_rds="results/sleuth/diffexp/{model}.genes-aggregated.diffexp.rds",
         genes_mostsigtrans_rds="results/sleuth/diffexp/{model}.genes-mostsigtrans.diffexp.rds",
@@ -63,6 +74,9 @@ checkpoint sleuth_diffexp:
                                     category="Differential gene expression")
     params:
         model=get_model,
+        sig_level_volcano=config["diffexp"]["sig-level"]["volcano-plot"],
+        sig_level_ma=config["diffexp"]["sig-level"]["ma-plot"],
+        sig_level_qq=config["diffexp"]["sig-level"]["qq-plot"]
     conda:
         "../envs/sleuth.yaml"
     log:
@@ -70,18 +84,43 @@ checkpoint sleuth_diffexp:
     script:
         "../scripts/sleuth-diffexp.R"
 
+rule ihw_fdr_control:
+    input:
+        "results/tables/diffexp/{model}.{level}.diffexp.tsv"
+    output:
+        results=report("results/tables/ihw/{model}.{level}.ihw-results.tsv", caption="../report/ihw-results.rst", category="IHW"),
+        dispersion=report("results/plots/ihw/{level}/{model}.{level}.plot-dispersion.pdf", caption="../report/plot-dispersion-ihw.rst", category="IHW"),
+        histograms=report("results/plots/ihw/{level}/{model}.{level}.plot-histograms.pdf", caption="../report/plot-histograms-ihw.rst", category="IHW"),
+        trends=report("results/plots/ihw/{level}/{model}.{level}.plot-trends.pdf", caption="../report/plot-trends-ihw.rst", category="IHW"),
+        decision=report("results/plots/ihw/{level}/{model}.{level}.plot-decision.pdf", caption="../report/plot-decision-ihw.rst", category="IHW"),
+        adj_pvals=report("results/plots/ihw/{level}/{model}.{level}.plot-adj-pvals.pdf", caption="../report/plot-adj-pvals-ihw.rst", category="IHW")
+    conda:
+        "../envs/ihw.yaml"
+    log:
+        "logs/tables/ihw/{model}.{level}.ihw.log"
+    script:
+        "../scripts/ihw-fdr-control.R"
 
 rule plot_bootstrap:
     input:
-        "results/sleuth/{model}.rds"
+        so="results/sleuth/{model}.rds",
+        transcripts="results/tables/diffexp/{model}.transcripts.diffexp.tsv"
     output:
-        report("results/plots/bootstrap/{gene}/{gene}.{transcript}.{model}.bootstrap.pdf", caption="../report/plot-bootstrap.rst", category="Expression Plots")
+        report(
+            directory("results/plots/bootstrap/{model}"),
+            patterns=["{gene}.{transcript}.{model}.bootstrap.pdf"],
+            caption="../report/plot-bootstrap.rst",
+            category="Expression Plots"
+        )
     conda:
         "../envs/sleuth.yaml"
     params:
-        color_by=config["bootstrap_plots"]["color_by"]
+        color_by=config["bootstrap_plots"]["color_by"],
+        fdr=config["bootstrap_plots"]["FDR"],
+        top_n=config["bootstrap_plots"]["top_n"],
+        genes=config["bootstrap_plots"]["genes_of_interest"]
     log:
-        "logs/plots/bootstrap/{gene}.{transcript}.{model}.plot_bootstrap.log"
+        "logs/plots/bootstrap/{model}/{model}.plot_bootstrap.log"
     script:
         "../scripts/plot-bootstrap.R"
 
@@ -90,7 +129,9 @@ rule plot_pca:
     input:
         "results/sleuth/all.rds"
     output:
-        report("results/plots/pca/{covariate}.pca.pdf", caption="../report/plot-pca.rst", category="PCA")
+        pca=report("results/plots/pca/{covariate}.pca.pdf", caption="../report/plot-pca.rst", category="PCA"),
+        pc_var=report("results/plots/pc-variance/{covariate}.pc-variance-plot.pdf", caption="../report/plot-pc-variance.rst", category="PCA"),
+        loadings=report("results/plots/loadings/{covariate}.loadings-plot.pdf", caption="../report/plot-loadings.rst", category="PCA")
     conda:
         "../envs/sleuth.yaml"
     log:
@@ -104,7 +145,7 @@ rule plot_diffexp_heatmap:
         so="results/sleuth/{model}.rds",
         diffexp="results/tables/diffexp/{model}.transcripts.diffexp.tsv"
     output:
-        report("results/plots/diffexp-heatmap/{model}.diffexp-heatmap.pdf", caption="../report/heatmap.rst", category="Heatmaps")
+        report("results/plots/diffexp-heatmap/{model}.diffexp-heatmap.pdf", caption="../report/plot-heatmap.rst", category="Heatmaps")
     params:
         model=get_model
     conda:
@@ -119,7 +160,7 @@ rule plot_diffexp_pval_hist:
     input:
         diffexp_rds="results/sleuth/diffexp/{model}.{level}.diffexp.rds"
     output:
-        report("results/plots/diffexp/{model}.{level}.diffexp-pval-hist.pdf", caption="../report/pval-hist.rst", category="QC")
+        report("results/plots/diffexp/{model}.{level}.diffexp-pval-hist.pdf", caption="../report/plot-pval-hist.rst", category="QC")
     params:
         model=get_model
     conda:
@@ -142,12 +183,37 @@ rule tpm_matrix:
     script:
         "../scripts/sleuth-to-matrix.R"
 
+rule plot_group_density:
+    input:
+        "results/sleuth/all.rds"
+    output:
+        report("results/plots/group_density/{model}.group_density.pdf", caption="../report/plot-group-density.rst", category="QC")
+    conda:
+        "../envs/sleuth.yaml"
+    log:
+        "logs/plots/group_density/{model}.group_density.log"
+    script:
+        "../scripts/plot-group-density.R"
+
+rule plot_scatter:
+     input:
+         "results/sleuth/all.rds"
+     output:
+         report("results/plots/scatter/{model}.scatter.pdf", caption="../report/plot-scatter.rst", category="QC")
+     # params:
+     #     covariate=lambda w: config["diffexp"]["models"][w.model]["primary_variable"]
+     conda:
+         "../envs/sleuth.yaml"
+     log:
+         "logs/plots/scatter/{model}.scatter.log"
+     script:
+         "../scripts/plot-scatter.R"
 
 rule plot_fragment_length_dist:
     input:
         "results/sleuth/all.rds"
     output:
-        report("results/plots/fld/{sample}-{unit}.fragment-length-dist.pdf", caption="../report/fld.rst", category="Fragment length distribution")
+        report("results/plots/fld/{sample}-{unit}.fragment-length-dist.pdf", caption="../report/plot-fld.rst", category="Fragment length distribution")
     conda:
         "../envs/sleuth.yaml"
     log:

@@ -6,4 +6,3 @@ dependencies:
   - bioconductor-spia =2.38
   - bioconductor-graphite =1.32
   - r-tidyverse =1.2
-  - r-rhpcblasctl =0.20

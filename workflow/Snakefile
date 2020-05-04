@@ -34,15 +34,14 @@ def all_input(wildcards):
                     [
                         "results/tables/fgsea/{model}.all-gene-sets.tsv",
                         "results/tables/fgsea/{model}.sig-gene-sets.tsv",
-                        "results/plots/fgsea/{model}.table-plot.pdf"
+                        "results/plots/fgsea/{model}.table-plot.pdf",
+                        "results/plots/fgsea/{model}"
                     ],
                     model=config["diffexp"]["models"],
                     gene_set_fdr=str(config["enrichment"]["fgsea"]["fdr_gene_set"]).replace('.','-'),
                     nperm=str(config["enrichment"]["fgsea"]["nperm"])
                 )
             )
-        for model in config["diffexp"]["models"]:
-            wanted_input.extend( get_fgsea_plots(model) )
 
     # request spia if 'activated' in config.yaml
     if config["enrichment"]["spia"]["activate"]:
@@ -59,6 +58,10 @@ def all_input(wildcards):
     wanted_input.extend(
             expand(
                 [
+                    "results/plots/mean-var/{model}.mean-variance-plot.pdf",
+                    "results/plots/volcano/{model}.volcano-plots.pdf",
+                    "results/plots/ma/{model}.ma-plots.pdf",
+                    "results/plots/qq/{model}.qq-plots.pdf",
                     "results/tables/diffexp/{model}.transcripts.diffexp.tsv",
                     "results/plots/diffexp-heatmap/{model}.diffexp-heatmap.pdf",
                     "results/tables/tpm-matrix/{model}.tpm-matrix.tsv",
@@ -66,6 +69,23 @@ def all_input(wildcards):
                 model=config["diffexp"]["models"]
             )
         )
+        
+    # ihw false discovery rate control
+    wanted_input.extend(
+            expand(
+                [
+                    "results/tables/ihw/{model}.{level}.ihw-results.tsv",
+                    "results/plots/ihw/{level}/{model}.{level}.plot-dispersion.pdf",
+                    "results/plots/ihw/{level}/{model}.{level}.plot-histograms.pdf",
+                    "results/plots/ihw/{level}/{model}.{level}.plot-trends.pdf",
+                    "results/plots/ihw/{level}/{model}.{level}.plot-decision.pdf",
+                    "results/plots/ihw/{level}/{model}.{level}.plot-adj-pvals.pdf"
+                ],
+                model=config["diffexp"]["models"],
+                level=["transcripts", "genes-aggregated", "genes-mostsigtrans"]
+            )
+        )
+
     # sleuth p-value histogram plots
     wanted_input.extend(
             expand("results/plots/diffexp/{model}.{level}.diffexp-pval-hist.pdf",
@@ -81,13 +101,33 @@ def all_input(wildcards):
 
     # PCA plots of kallisto results, each coloured for a different covariate
     wanted_input.extend(
-            expand("results/plots/pca/{covariate}.pca.pdf", covariate=samples.columns[samples.columns != "sample"])
+            expand([
+                       "results/plots/pc-variance/{covariate}.pc-variance-plot.pdf",
+                       "results/plots/loadings/{covariate}.loadings-plot.pdf",
+                       "results/plots/pca/{covariate}.pca.pdf"
+                   ],
+                   covariate=samples.columns[samples.columns != "sample"])
+        )
+
+    # group-density plot
+    wanted_input.extend(
+             expand(["results/plots/group_density/{model}.group_density.pdf"],
+                 model=config["diffexp"]["models"])
+        )
+
+    # scatter plots
+    if config["scatter"]["activate"]:
+        wanted_input.extend(
+                  expand(["results/plots/scatter/{model}.scatter.pdf"],
+                      model=config["diffexp"]["models"])
         )
 
     # sleuth bootstrap plots
-    for model in config["diffexp"]["models"]:
-        wanted_input.extend( get_bootstrap_plots(model) )
-        wanted_input.extend( get_bootstrap_plots(model, config["bootstrap_plots"]["genes_of_interest"]) )
+    wanted_input.extend(
+            expand("results/plots/bootstrap/{model}",
+                model=config["diffexp"]["models"]
+            )
+        )
 
     # fragment length distribution plots
     wanted_input.extend(

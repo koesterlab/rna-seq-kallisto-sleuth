@@ -3,23 +3,24 @@ sink(log)
 sink(log, type="message")
 
 library("SPIA")
-
-# * provides library("tidyverse")
-# * tries to load require("RhpcBLASctl") to limit BLAS core usage
-# * provides functions load_bioconductor_package() and
-#   get_prefix_col(), the latter requires snakemake@output[["samples"]]
-#   and snakemake@params[["covariate"]]
-source( file.path(snakemake@scriptdir, 'common.R') )
-
 library("graphite")
+
+# provides library("tidyverse") and functions load_bioconductor_package() and
+# get_prefix_col(), the latter requires snakemake@output[["samples"]] and
+# snakemake@params[["covariate"]]
+source( file.path(snakemake@scriptdir, 'common.R') )
 
 pkg <- snakemake@params[["bioc_pkg"]]
 load_bioconductor_package(snakemake@input[["species_anno"]], pkg)
+
+
 
 pw_db <- snakemake@params[["pathway_db"]]
 
 db <- pathways(snakemake@params[["species"]], pw_db)
 db <- convertIdentifiers(db, "ENSEMBL")
+
+options(Ncpus = snakemake@threads)
 
 diffexp <- read_tsv(snakemake@input[["diffexp"]]) %>%
             drop_na(ens_gene) %>%
